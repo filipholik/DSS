@@ -65,7 +65,7 @@ void emulateRealTraffic(IMasterConnection connection)
 {
 	CS101_AppLayerParameters alParams = IMasterConnection_getApplicationLayerParameters(connection);
 
- 	/* M_ME_NC_1 Real Traffic Example */ 
+ 	/* 1. M_ME_NC_1 Real Traffic Example */ 
 	CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION,
 		0, 1, false, false);
 
@@ -83,8 +83,19 @@ void emulateRealTraffic(IMasterConnection connection)
 	CS101_ASDU_destroy(newAsdu);
 	/* END */
 
-	/* M_SP_TB_1 Real Traffic Example */ 
+	/* 2. M_ME_TF_1 Real Traffic Example */ 
 	CP56Time2a timestamp = CP56Time2a_createFromMsTimestamp(NULL, Hal_getTimeInMs()); 
+	newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS,
+		0, 1, false, false);
+	io = (InformationObject) MeasuredValueShortWithCP56Time2a_create(NULL, 1, 29.875, IEC60870_QUALITY_GOOD, timestamp);
+	CS101_ASDU_addInformationObject(newAsdu, io);
+		
+	InformationObject_destroy(io);
+	IMasterConnection_sendASDU(connection, newAsdu);
+	CS101_ASDU_destroy(newAsdu);
+	/* END */
+
+	/* 3. M_SP_TB_1 Real Traffic Example */ 
 	newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
 	io = (InformationObject) SinglePointWithCP56Time2a_create(NULL, 11, false, IEC60870_QUALITY_GOOD,timestamp);
@@ -95,7 +106,7 @@ void emulateRealTraffic(IMasterConnection connection)
 	CS101_ASDU_destroy(newAsdu);
 	/* END */
 
-	/* M_IT_TB_1 Real Traffic Example */ 
+	/* 4. M_IT_TB_1 Real Traffic Example */ 
 	BinaryCounterReading bcr = BinaryCounterReading_create(NULL, 0, 10, false, false, false); 
 	newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS,
 		0, 1, false, false);
@@ -105,17 +116,6 @@ void emulateRealTraffic(IMasterConnection connection)
 	io = (InformationObject) IntegratedTotalsWithCP56Time2a_create(NULL, 4007, bcr,timestamp);
 	CS101_ASDU_addInformationObject(newAsdu, io);	
 
-	InformationObject_destroy(io);
-	IMasterConnection_sendASDU(connection, newAsdu);
-	CS101_ASDU_destroy(newAsdu);
-	/* END */
-
-	/* M_ME_TF_1 Real Traffic Example */ 
-	newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS,
-		0, 1, false, false);
-	io = (InformationObject) MeasuredValueShortWithCP56Time2a_create(NULL, 1, 29.875, IEC60870_QUALITY_GOOD, timestamp);
-	CS101_ASDU_addInformationObject(newAsdu, io);
-		
 	InformationObject_destroy(io);
 	IMasterConnection_sendASDU(connection, newAsdu);
 	CS101_ASDU_destroy(newAsdu);
@@ -173,6 +173,7 @@ interrogationHandler(void* parameter, IMasterConnection connection, CS101_ASDU a
         newAsdu = CS101_ASDU_create(alParams, true, CS101_COT_INTERROGATED_BY_STATION,
                 0, 1, false, false);
 
+		/* 5. M_SP_NA_1 Modify the following for real traffic example */ 
         CS101_ASDU_addInformationObject(newAsdu, io = (InformationObject) SinglePointInformation_create(NULL, 300, true, IEC60870_QUALITY_GOOD));
         CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 301, false, IEC60870_QUALITY_GOOD));
         CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 302, true, IEC60870_QUALITY_GOOD));
