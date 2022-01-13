@@ -124,80 +124,6 @@ interrogationHandler(void* parameter, IMasterConnection connection, CS101_ASDU a
         CS101_AppLayerParameters alParams = IMasterConnection_getApplicationLayerParameters(connection);
 
         IMasterConnection_sendACT_CON(connection, asdu, false);
-
-        /* The CS101 specification only allows information objects without timestamp in GI responses */
-
-        /*CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION,
-                0, 1, false, false);
-
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 100, -1, IEC60870_QUALITY_GOOD);
-
-        CS101_ASDU_addInformationObject(newAsdu, io);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            MeasuredValueScaled_create((MeasuredValueScaled) io, 101, 23, IEC60870_QUALITY_GOOD));
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            MeasuredValueScaled_create((MeasuredValueScaled) io, 102, 2300, IEC60870_QUALITY_GOOD));
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-        newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION,
-                    0, 1, false, false);
-
-        io = (InformationObject) SinglePointInformation_create(NULL, 104, true, IEC60870_QUALITY_GOOD);
-
-        CS101_ASDU_addInformationObject(newAsdu, io);
-
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject)
-            SinglePointInformation_create((SinglePointInformation) io, 105, false, IEC60870_QUALITY_GOOD));
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-        newAsdu = CS101_ASDU_create(alParams, true, CS101_COT_INTERROGATED_BY_STATION,
-                0, 1, false, false);
-
-        CS101_ASDU_addInformationObject(newAsdu, io = (InformationObject) SinglePointInformation_create(NULL, 300, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 301, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 302, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 303, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 304, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 305, false, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 306, true, IEC60870_QUALITY_GOOD));
-        CS101_ASDU_addInformationObject(newAsdu, (InformationObject) SinglePointInformation_create((SinglePointInformation) io, 307, false, IEC60870_QUALITY_GOOD));
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-        newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_INTERROGATED_BY_STATION,
-                        0, 1, false, false);
-
-        io = (InformationObject) BitString32_create(NULL, 500, 0xaaaa);
-
-        CS101_ASDU_addInformationObject(newAsdu, io);
-
-        InformationObject_destroy(io);
-
-        IMasterConnection_sendASDU(connection, newAsdu);
-
-        CS101_ASDU_destroy(newAsdu);
-
-	*/
-
-	//emulateMeTfMessages(connection); 
-
-        //IMasterConnection_sendACT_TERM(connection, asdu);
     }
     else {
         IMasterConnection_sendACT_CON(connection, asdu, true);
@@ -300,8 +226,6 @@ void emulateRealTraffic(IMasterConnection connection)
 	CS101_ASDU_destroy(newAsdu);
 	/* END */
 
-	//Thread_sleep(1000);
-
 	/* 2. M_ME_TF_1 Real Traffic Example */ 
 	CP56Time2a timestamp = CP56Time2a_createFromMsTimestamp(NULL, Hal_getTimeInMs()); 
 	newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS,
@@ -314,8 +238,6 @@ void emulateRealTraffic(IMasterConnection connection)
 	CS101_ASDU_destroy(newAsdu);
 	/* END */
 
-	//Thread_sleep(1000);
-
 	/* 3. M_SP_TB_1 Real Traffic Example */ 
 	newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_SPONTANEOUS, 0, 1, false, false);
 
@@ -326,8 +248,6 @@ void emulateRealTraffic(IMasterConnection connection)
 	IMasterConnection_sendASDU(connection, newAsdu);
 	CS101_ASDU_destroy(newAsdu);
 	/* END */
-
-	//Thread_sleep(1000);
 
 	/* 4. M_IT_TB_1 Real Traffic Example */ 
 	BinaryCounterReading bcr = BinaryCounterReading_create(NULL, 0, 10, false, false, false); 
@@ -456,16 +376,6 @@ main(int argc, char** argv)
     while (running) {		
 
         Thread_sleep(1000);
-
-        /*CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_PERIODIC, 0, 1, false, false);
-
-        InformationObject io = (InformationObject) MeasuredValueScaled_create(NULL, 110, scaledValue, IEC60870_QUALITY_GOOD);
-
-        scaledValue++;
-
-        CS101_ASDU_addInformationObject(newAsdu, io);
-
-        InformationObject_destroy(io);*/
 
 	// Send periodical messages 
 	CS101_ASDU newAsdu = CS101_ASDU_create(alParams, false, CS101_COT_PERIODIC,
