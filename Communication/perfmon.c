@@ -6,12 +6,18 @@
 #include <stdlib.h>
 
 // SG Performance Thresholds 
-int MAX_DELAY_MS = 500; 
-int MAX_IPDV = 500; 
+int MAX_DELAY_MS = 500; // in ms 
+int MAX_IPDV = 500; // in ms 
+int MAX_ACCEPTABLE_EXCEED_PERCENT = 1; // in percentage
+int MAX_PACKET_LOSS = 1; // in percentage
 
+int EXPERIMENT_LENGTH_SEC = 60; // in seconds 
+
+// Logging configuration
 bool writeToFile = true; 
-FILE *file = NULL; 
+const char* FILE_LOCATION = "../../../logs/";
 
+FILE *file = NULL; 
 CP56Time2a measurementStart = NULL; 
 CP56Time2a previousTime = NULL; 
 int measuredPackets = 0; 
@@ -24,6 +30,7 @@ int maxJitter = 0;
 int avgJitterSum = 0; 
 int avgDelaySum = 0; 
 int maxDelay = 0; 
+int dssNumber = 0; 
 
 void
 printCP56Time2a(CP56Time2a time)
@@ -51,19 +58,38 @@ rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
     printf("\n");
 }
 
-static void calculatePacketLoss()
+static void printMeasurementStats()
 {
+	printf("--- Measurement statistics --- \n"); 
+	printf("Sent packets: %i  \n", measuredPackets); 
+	printf("Delay exceeding threshold: %i (%.2f%%) \n", delayThresholdExc, delayThresholdExc/(measuredPackets/100.0)); 
+	printf("IPDV exceeding threshold: %i (%.2f%%) \n", ipdvThresholdExc, ipdvThresholdExc/(measuredPackets/100.0)); 
+
 	CP56Time2a timestamp = CP56Time2a_createFromMsTimestamp(NULL, Hal_getTimeInMs()); 	
 	int experimentRunTimeMs = CP56Time2a_toMsTimestamp(timestamp) - CP56Time2a_toMsTimestamp(measurementStart);  	
 	double loss = 100.0 - (measuredPackets/(experimentRunTimeMs/100000.0)); 
 	if (loss < 0) {
 		loss = 0.0; 
 	}
-       //printf("Measurement run for: %i s, received messages: %i, loss: %.2f %% \n", experimentRunTimeMs/1000, measuredPackets, loss); 
 	printf("Packet loss: %.2f%% \n", loss); 
+
 	if(writeToFile){	
-		fprintf(file, "PACKET LOSS;%.2f\n",loss); 
+		fprintf(file, "\nPACKET LOSS:;%.2f% \n",loss); 
 	}
+
+	if (loss > MAX_PACKET_LOSS || delayThresholdExc/(measuredPackets/100.0) > MAX_ACCEPTABLE_EXCEED_PERCENT || ipdvThresholdExc/(measuredPackets/100.0) > MAX_ACCEPTABLE_EXCEED_PERCENT){
+		printf("Status: FAILED \n"); 
+		if(writeToFile) {fprintf(file, "STATUS:;FAILED\n"); }
+	}else{
+		if (loss < MAX_PACKET_LOSS && delayThresholdExc == 0 && ipdvThresholdExc == 0){
+			printf("Status: PASSED \n"); 
+			if(writeToFile) {fprintf(file, "STATUS:;PASSED\n"); }
+		}else{
+			printf("Status: WARNING \n"); 
+			if(writeToFile) {fprintf(file, "STATUS:;WARNING\n"); }
+		}
+	}
+	printf("   ------ \n"); 
 }
 
 /* Connection event handler */
@@ -75,18 +101,24 @@ connectionHandler (void* parameter, CS104_Connection connection, CS104_Connectio
         printf("Connection established\n");
 	if(writeToFile){	
 		CP56Time2a time = CP56Time2a_createFromMsTimestamp(NULL, Hal_getTimeInMs()); 	
-		char filename[25]; 	
-		sprintf(filename, "log_%02i%02i%02i.%02i.csv", CP56Time2a_getHour(time),
+		char filename[50]; 	
+		sprintf(filename, "dss_%i_perf_log_%02i%02i%02i-%02i%02i%02i.%02i.csv", dssNumber, 
+				CP56Time2a_getYear(time),				
+				CP56Time2a_getMonth(time),
+				CP56Time2a_getDayOfMonth(time),
+				CP56Time2a_getHour(time),
                              CP56Time2a_getMinute(time),
                              CP56Time2a_getSecond(time),
 				CP56Time2a_getMillisecond(time));	 
-		file = fopen(filename, "w+"); 	
-		fprintf(file, "NUM;DELAY;IPDV\n"); 
+		char* fn; 		
+		asprintf(&fn, "%s%s", FILE_LOCATION, filename);  
+		file = fopen(fn, "w+"); 	
+		fprintf(file, "NUM;DELAY (ms);IPDV (ms)\n"); 
 	}
         break;
     case CS104_CONNECTION_CLOSED:
         printf("Connection closed\n");
-	calculatePacketLoss(); 
+	printMeasurementStats(); 
 	if(writeToFile){			
 		fclose(file);	
 	}
@@ -113,29 +145,26 @@ asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
             CS101_ASDU_getTypeID(asdu),
             CS101_ASDU_getNumberOfElements(asdu));
 
-    //------------- MEASUREMENT ------------- //
+    //------------- MEASUREMENT START ------------- //
     if(CS101_ASDU_getNumberOfElements(asdu) == 5) {
         int seqNum = CS101_ASDU_getOA(asdu); 
         CP56Time2a timestamp = CP56Time2a_createFromMsTimestamp(NULL, Hal_getTimeInMs()); 
+
 	//Get packet timestamp 
 	InformationObject io = CS101_ASDU_getElement(asdu, 0); 
 	CP56Time2a sendTimestamp = MeasuredValueShortWithCP56Time2a_getTimestamp((MeasuredValueShortWithCP56Time2a)io); 	
+
 	int delay = CP56Time2a_toMsTimestamp(timestamp) - CP56Time2a_toMsTimestamp(sendTimestamp);  	
-       //printf("Send: "); printCP56Time2a(sendTimestamp); printf(" Received: "); printCP56Time2a(timestamp); 
-	// printf(", seqNum: %i \n", seqNum);
+
 	if(previousTime == NULL) {
 		    previousTime = timestamp; 
 	} 
 	int diff = CP56Time2a_toMsTimestamp(timestamp) - CP56Time2a_toMsTimestamp(previousTime); 
  	CP56Time2a timediff = CP56Time2a_createFromMsTimestamp(NULL, diff); 
-	//printf("Time diff: "); printCP56Time2a(timediff); printf("\n");
-	//printf("Time diff ms: %i ms \n", diff); 
         
 	int variance = diff - 1000; 
-        //int variance = CP56Time2a_getMillisecond(timestamp) - CP56Time2a_getMillisecond(previousTime); 
-	//if(CP56Time2a_getSecond(timestamp) < 59  - CP56Time2a_getMillisecond(previousTime);)
 
-	if(seqNum > 2){
+	if(seqNum > 2){ // Ignore first two packets
 		if(seqNum == 3){
 			measurementStart = timestamp; 
 		}		
@@ -163,14 +192,13 @@ asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
 		avgJitterSum += abs(variance); 
         	measuredPackets++; 
 		avgDelaySum += delay; 		
-              printf("--- Measurement statistics (%i) --- \n", measuredPackets); 
+              printf("--- Measurement in progress (%i/%i s) --- \n", measuredPackets, EXPERIMENT_LENGTH_SEC); 
 		printf("Delay: %i ms, max: %i ms, avg: %i ms, err: %i (%.2f%%) \n", 
 			delay, maxDelay, avgDelaySum/measuredPackets, delayThresholdExc, delayThresholdExc/(measuredPackets/100.0)); 
 		printf("IPDV: %i ms, min/max: %i/%i ms, avg: %i ms, err: %i (%.2f%%) \n", 
 			variance, minVariance, maxVariance, avgVarianceSum/measuredPackets, ipdvThresholdExc, ipdvThresholdExc/(measuredPackets/100.0)); 
 		printf("Jitter: %i ms, max: %i ms, avg: %i ms \n", 
 			abs(variance), maxJitter, avgJitterSum/measuredPackets); 
-		//printf("IPDV: %i ms, max: %i ms, avg: %i ms (run: %i s)\n", variance, maxVariance, avgVarianceSum/avgVarianceNum, avgVarianceNum); 
 
 		if(writeToFile){
 			fprintf(file, "%i;%i;%i\n",measuredPackets,delay,variance); 				
@@ -235,14 +263,16 @@ main(int argc, char** argv)
     if (argc > 2)
         port = atoi(argv[2]);
 
+    if (strcmp(ip, "1.1.1.1") == 0)
+        dssNumber = 1;
+    else
+       dssNumber = 2; 
+
     printf("Connecting to: %s:%i\n", ip, port);
     CS104_Connection con = CS104_Connection_create(ip, port);
 
     CS104_Connection_setConnectionHandler(con, connectionHandler, NULL);
     CS104_Connection_setASDUReceivedHandler(con, asduReceivedHandler, NULL);
-
-    /* uncomment to log messages */
-    //CS104_Connection_setRawMessageHandler(con, rawMessageHandler, NULL);
 
     if (CS104_Connection_connect(con)) {
         printf("Connected!\n");
@@ -255,39 +285,9 @@ main(int argc, char** argv)
 
         Thread_sleep(5000);
 
-        while(1){
-		//CS104_Connection_sendInterrogationCommand(con, CS101_COT_ACTIVATION, 1, IEC60870_QOI_STATION);
-
-		//Read request functionality
-		srand(time(0)); 
-		int randIOA = (rand() % 7) + 1; 
-		CS104_Connection_sendReadCommand(con, 0, 7); 
-		int randTimeInterval = ((rand() % 59) + 1)*1000; 
-		//printf("Next read request in: %i seconds. \n", randTimeInterval/1000);
-		Thread_sleep(randTimeInterval); //10000
-	}
-
-#if 0
-        InformationObject sc = (InformationObject)
-                SingleCommand_create(NULL, 5000, true, false, 0);
-
-        printf("Send control command C_SC_NA_1\n");
-        CS104_Connection_sendProcessCommandEx(con, CS101_COT_ACTIVATION, 1, sc);
-
-        InformationObject_destroy(sc);
-
-        /* Send clock synchronization command */
-        struct sCP56Time2a newTime;
-
-        CP56Time2a_createFromMsTimestamp(&newTime, Hal_getTimeInMs());
-
-        printf("Send time sync command\n");
-        CS104_Connection_sendClockSyncCommand(con, 1, &newTime);
-#endif
-
         printf("Wait ...\n");
 
-        Thread_sleep(1000);
+        Thread_sleep(EXPERIMENT_LENGTH_SEC * 1000 - 6500); //minus communication establishment 
     }
     else
         printf("Connect failed!\n");
